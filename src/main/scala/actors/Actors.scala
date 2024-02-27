@@ -17,6 +17,8 @@ object Actors {
 
     case class GetMobileById(id: Int)
     case class DeleteById(id:Int)
+    case object DeleteAll
+    case class UpdateById(id: Int, newPriceToUpdate: Double)
   }
 
   private class MobileDbActor extends Actor with ActorLogging {
@@ -35,6 +37,10 @@ object Actors {
         sender() ! getMobileById(id)
       case DeleteById(id) =>
         sender() ! deleteById(id)
+      case DeleteAll =>
+        sender() ! deleteAll
+      case UpdateById(id, newPriceToUpdate) =>
+        sender() ! updateById(id, newPriceToUpdate)
     }
   }
 

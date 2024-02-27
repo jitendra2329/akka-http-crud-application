@@ -44,9 +44,34 @@ object Database {
         None
       case Success(value) => if (value != 0) Some(s"$value row Deleted!") else Some("No record exists!")
     }
-
   }
 
+  def deleteAll(): Option[String] = {
+    Try(DB autoCommit { implicit session =>
+      println("Inside deleteAll method.")
+      SQL(BaseQuery.deleteAllQuery()).executeUpdate()
+    }) match {
+      case Failure(ex) =>
+        println("**************" + ex.getCause + "******" + ex.getClass + " ********" + ex.getMessage)
+        None
+      case Success(_) => Some("All records Deleted!")
+    }
+  }
+
+  def updateById(id: Int, newPriceToUpdate: Double): Option[String] = {
+    Try {
+      DB autoCommit { implicit session =>
+        SQL(BaseQuery.updateByIdQuery())
+          .bind(newPriceToUpdate, id)
+          .executeUpdate()
+      }
+    } match {
+      case Failure(ex) =>
+        println("**************" + ex.getCause + "******" + ex.getClass + " ********" + ex.getMessage)
+        None
+      case Success(value) => Some(s"$value row Updated")
+    }
+  }
 
   private object BaseQuery {
 
@@ -90,6 +115,14 @@ object Database {
     def deleteByIdQuery(id: Int): DeleteQuery = {
       s"""DELETE FROM mobiles WHERE id = '$id';
          |""".stripMargin
+    }
+
+    def deleteAllQuery(): DeleteQuery = {
+      """TRUNCATE TABLE mobiles;"""
+    }
+
+    def updateByIdQuery(): UpdateQuery = {
+      "UPDATE mobiles SET price = ? WHERE id = ?"
     }
   }
 }

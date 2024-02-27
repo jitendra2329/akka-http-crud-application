@@ -6,7 +6,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.util.Timeout
-import models.Models.{Mobile, MobileForm}
+import models.Models.{Mobile, MobileForm, MobileUpdateForm}
 import spray.json._
 
 import scala.concurrent.Future
@@ -18,6 +18,7 @@ import scala.util.{Failure, Success, Try}
 trait MobileJsonProtocol extends DefaultJsonProtocol {
   implicit val mobileFormat: RootJsonFormat[Mobile] = jsonFormat4(Mobile)
   implicit val mobileFormFormat: RootJsonFormat[MobileForm] = jsonFormat3(MobileForm)
+  implicit val mobileUpdateFormFormat: RootJsonFormat[MobileUpdateForm] = jsonFormat1(MobileUpdateForm)
 }
 
 object Main extends App with MobileJsonProtocol {
@@ -80,9 +81,19 @@ object Main extends App with MobileJsonProtocol {
     }
   }
 
+  def updateById(query: Uri.Query, mobileUpdateForm: MobileUpdateForm): Future[Option[String]] = {
+    query.get("id") match {
+      case Some(value) =>
+        Try(value.toInt) match {
+          case Failure(_) => Future(None)
+          case Success(id) => (mobileDbActor ? UpdateById(id, mobileUpdateForm.price)).mapTo[Option[String]]
+        }
+      case None => Future(None)
+    }
+  }
+
   private val httpRequestHandler: HttpRequest => Future[HttpResponse] = {
     case HttpRequest(HttpMethods.POST, Uri.Path("/api/mobile"), _, entity, _) =>
-
       val strictFuture = entity.toStrict(2 seconds)
       strictFuture.flatMap { strictEntity =>
         val mobileJsonString = strictEntity.data.utf8String
@@ -117,6 +128,20 @@ object Main extends App with MobileJsonProtocol {
       } else {
         getMobile(query)
       }
+    case HttpRequest(HttpMethods.DELETE, Uri.Path("/api/mobile/delete/all"), _, _, _) =>
+      val deleteMobile = (mobileDbActor ? DeleteAll).mapTo[Option[String]]
+      for {
+        dm <- deleteMobile
+      } yield {
+        dm match {
+          case Some(value) =>
+            HttpResponse(
+              StatusCodes.OK,
+              entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, value))
+          case None => HttpResponse(StatusCodes.NoContent)
+        }
+      }
+
     case HttpRequest(HttpMethods.DELETE, uri@Uri.Path("/api/mobile"), _, _, _) =>
       val query = uri.query()
       if (query.isEmpty) {
@@ -140,11 +165,31 @@ object Main extends App with MobileJsonProtocol {
           }
         }
       }
-    case _ => Future(HttpResponse(StatusCodes.BadRequest))
+    case HttpRequest(HttpMethods.PUT, uri@Uri.Path("/api/mobile"), _, entity, _) =>
+
+      val strictFuture = entity.toStrict(2 seconds)
+      strictFuture.flatMap { strictEntity =>
+        val mobileJsonString = strictEntity.data.utf8String
+        println(s"Received data from client: $mobileJsonString")
+        val mobile = mobileJsonString.parseJson.convertTo[MobileUpdateForm]
+
+        val mobileCreated = updateById(uri.query(), mobile)
+        for {
+          mob <- mobileCreated
+        } yield {
+          HttpResponse(
+            StatusCodes.OK,
+            entity = HttpEntity(
+              ContentTypes.`text/plain(UTF-8)`,
+              s"${mob.get}"
+            )
+          )
+        }
+      }
+    case _ => Future(HttpResponse(StatusCodes.NoContent))
   }
 
-  println("Above the server start")
-  val res = Http().newServerAt("localhost", 9000).bind(httpRequestHandler)
+  val server = Http().newServerAt("localhost", 9000).bind(httpRequestHandler)
   println("Server is running on http://localhost:9000")
 
   StdIn.readLine()
