@@ -190,6 +190,7 @@ object Main extends App with MobileJsonProtocol {
   }
 
   val server = Http().newServerAt("localhost", 9000).bind(httpRequestHandler)
+
   println("Server is running on http://localhost:9000")
 
   StdIn.readLine()

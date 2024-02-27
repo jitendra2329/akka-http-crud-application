@@ -16,8 +16,11 @@ object Actors {
     case object GetAllMobiles
 
     case class GetMobileById(id: Int)
-    case class DeleteById(id:Int)
+
+    case class DeleteById(id: Int)
+
     case object DeleteAll
+
     case class UpdateById(id: Int, newPriceToUpdate: Double)
   }
 
@@ -36,10 +39,13 @@ object Actors {
         log.info(s"getting the mobile information by id: $id")
         sender() ! getMobileById(id)
       case DeleteById(id) =>
+        log.info(s"deleting data by id: $id")
         sender() ! deleteById(id)
       case DeleteAll =>
+        log.info("deleting all the data from DB.")
         sender() ! deleteAll
       case UpdateById(id, newPriceToUpdate) =>
+        log.info(s"updating by id: $id")
         sender() ! updateById(id, newPriceToUpdate)
     }
   }
