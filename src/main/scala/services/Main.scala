@@ -27,8 +27,6 @@ object Main extends App with MobileJsonProtocol {
 
   implicit val defaultTimeout: Timeout = Timeout(2 seconds)
 
-  println("Inside main ")
-
   private def getMobile(query: Uri.Query): Future[HttpResponse] = {
     val mobileId = query.get("id")
 

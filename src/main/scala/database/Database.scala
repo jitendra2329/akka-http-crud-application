@@ -1,11 +1,12 @@
 package database
 
+import Dao.Dao
 import models.Models.{Mobile, MobileForm}
 import scalikejdbc.{DB, DBSession, SQL}
 
 import scala.util.{Failure, Success, Try}
 
-object Database {
+object Database extends Dao {
 
   implicit val session: DBSession = Connection.session
 
