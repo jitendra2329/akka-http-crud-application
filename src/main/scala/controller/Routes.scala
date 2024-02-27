@@ -11,7 +11,6 @@ import spray.json._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.io.StdIn
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
@@ -31,8 +30,9 @@ object Routes extends MobileJsonProtocol {
     val mobileId = query.get("id")
 
     mobileId match {
-      case Some(id) =>
-        Try(id.toInt) match {
+      case Some(idString) =>
+
+        Try(idString.toInt) match {
           case Failure(ex) =>
             Future(
               HttpResponse(
@@ -40,48 +40,55 @@ object Routes extends MobileJsonProtocol {
                 entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, ex.getCause.toString)
               )
             )
+
           case Success(id) =>
-            val mobileFuture = (mobileDbActor ? GetMobileById(id)).mapTo[List[Mobile]]
+
+            val futureListMobile = (mobileDbActor ? GetMobileById(id)).mapTo[List[Mobile]]
             for {
-              mob <- mobileFuture
+              listMobile <- futureListMobile
             } yield {
               HttpResponse(
                 StatusCodes.OK,
                 entity = HttpEntity(
                   ContentTypes.`application/json`,
-                  mob.toJson.prettyPrint
+                  listMobile.toJson.prettyPrint
                 )
               )
             }
         }
+
       case None => Future(HttpResponse(StatusCodes.NoContent))
     }
   }
 
 
   def deleteById(query: Uri.Query): Future[Option[String]] = {
+
     val mobileId = query.get("id")
     mobileId match {
-      case Some(value) =>
-        Try(value.toInt) match {
+      case Some(idString) =>
+
+        Try(idString.toInt) match {
           case Failure(_) => Future(None)
-          case Success(value) =>
-            val result = (mobileDbActor ? DeleteById(value)).mapTo[Option[String]]
+          case Success(id) =>
+            val futureOptionalString = (mobileDbActor ? DeleteById(id)).mapTo[Option[String]]
             for {
-              res <- result
-            } yield res match {
-              case Some(value) => Some(value)
+              optionalString <- futureOptionalString
+            } yield optionalString match {
+              case Some(string) => Some(string)
               case None => None
             }
         }
+
       case None => Future(None)
     }
   }
 
   def updateById(query: Uri.Query, mobileUpdateForm: MobileUpdateForm): Future[Option[String]] = {
     query.get("id") match {
-      case Some(value) =>
-        Try(value.toInt) match {
+      case Some(idString) =>
+
+        Try(idString.toInt) match {
           case Failure(_) => Future(None)
           case Success(id) => (mobileDbActor ? UpdateById(id, mobileUpdateForm.price)).mapTo[Option[String]]
         }
@@ -90,57 +97,66 @@ object Routes extends MobileJsonProtocol {
   }
 
   private val httpRequestHandler: HttpRequest => Future[HttpResponse] = {
+
     case HttpRequest(HttpMethods.POST, Uri.Path("/api/mobile"), _, entity, _) =>
       val strictFuture = entity.toStrict(2 seconds)
       strictFuture.flatMap { strictEntity =>
         val mobileJsonString = strictEntity.data.utf8String
+
         println(s"Received data from client: $mobileJsonString")
+
         val mobile = mobileJsonString.parseJson.convertTo[MobileForm]
-        val mobileCreated = (mobileDbActor ? CreateMobile(mobile)).mapTo[MobileCreated]
+        val futureMobileCreated = (mobileDbActor ? CreateMobile(mobile)).mapTo[MobileCreated]
+
         for {
-          mob <- mobileCreated
+          mobileCreated <- futureMobileCreated
         } yield {
           HttpResponse(
             StatusCodes.OK,
             entity = HttpEntity(
               ContentTypes.`text/plain(UTF-8)`,
-              s"New mobile is added into the db with id: ${mob.id}"
+              s"New mobile is added into the db with id: ${mobileCreated.id}"
             )
           )
         }
       }
+
     case HttpRequest(HttpMethods.GET, uri@Uri.Path("/api/mobile"), _, _, _) =>
       val query = uri.query()
       if (query.isEmpty) {
-        val allMobiles = (mobileDbActor ? GetAllMobiles).mapTo[List[Mobile]]
+        val futureListAllOfMobiles = (mobileDbActor ? GetAllMobiles).mapTo[List[Mobile]]
+
         for {
-          mob <- allMobiles
+          listOfAllMobiles <- futureListAllOfMobiles
         } yield HttpResponse(
           StatusCodes.OK,
           entity = HttpEntity(
             ContentTypes.`application/json`,
-            mob.toJson.prettyPrint
+            listOfAllMobiles.toJson.prettyPrint
           )
         )
       } else {
         getMobile(query)
       }
+
     case HttpRequest(HttpMethods.DELETE, Uri.Path("/api/mobile/delete/all"), _, _, _) =>
-      val deleteMobile = (mobileDbActor ? DeleteAll).mapTo[Option[String]]
+      val futureOptionalString = (mobileDbActor ? DeleteAll).mapTo[Option[String]]
+
       for {
-        dm <- deleteMobile
+        optionalString <- futureOptionalString
       } yield {
-        dm match {
-          case Some(value) =>
+        optionalString match {
+          case Some(stringValue) =>
             HttpResponse(
               StatusCodes.OK,
-              entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, value))
+              entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, stringValue))
           case None => HttpResponse(StatusCodes.NoContent)
         }
       }
 
     case HttpRequest(HttpMethods.DELETE, uri@Uri.Path("/api/mobile"), _, _, _) =>
       val query = uri.query()
+
       if (query.isEmpty) {
         Future(HttpResponse(
           StatusCodes.NoContent,
@@ -150,39 +166,44 @@ object Routes extends MobileJsonProtocol {
           )))
       } else {
         for {
-          value <- deleteById(query)
+          optionalString <- deleteById(query)
         } yield {
-          value match {
-            case Some(value) =>
+          optionalString match {
+            case Some(stringValue) =>
               HttpResponse(
                 StatusCodes.OK,
-                entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, value)
+                entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, stringValue)
               )
             case None => HttpResponse(StatusCodes.BadRequest)
           }
         }
       }
+
     case HttpRequest(HttpMethods.PUT, uri@Uri.Path("/api/mobile"), _, entity, _) =>
 
       val strictFuture = entity.toStrict(2 seconds)
       strictFuture.flatMap { strictEntity =>
         val mobileJsonString = strictEntity.data.utf8String
+
         println(s"Received data from client: $mobileJsonString")
+
         val mobile = mobileJsonString.parseJson.convertTo[MobileUpdateForm]
 
-        val mobileCreated = updateById(uri.query(), mobile)
+        val futureOptionalString = updateById(uri.query(), mobile)
+
         for {
-          mob <- mobileCreated
+          optionalString <- futureOptionalString
         } yield {
           HttpResponse(
             StatusCodes.OK,
             entity = HttpEntity(
               ContentTypes.`text/plain(UTF-8)`,
-              s"${mob.get}"
+              s"${optionalString.get}"
             )
           )
         }
       }
+
     case _ => Future(HttpResponse(StatusCodes.NoContent))
   }
 

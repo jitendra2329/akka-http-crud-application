@@ -60,6 +60,7 @@ object Database extends Dao {
   }
 
   def updateById(id: Int, newPriceToUpdate: Double): Option[String] = {
+
     Try {
       DB autoCommit { implicit session =>
         SQL(BaseQuery.updateByIdQuery())

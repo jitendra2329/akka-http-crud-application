@@ -17,8 +17,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
 )
 
-// https://mvnrepository.com/artifact/io.spray/spray-json
-//libraryDependencies += "io.spray" %% "spray-json" % "1.3.6"
 libraryDependencies += "com.typesafe.akka" %% "akka-http-spray-json" % "10.6.0"
 libraryDependencies ++= Seq(
   "org.scalikejdbc" %% "scalikejdbc"       % "4.2.1",
