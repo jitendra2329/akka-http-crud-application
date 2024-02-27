@@ -1,4 +1,4 @@
-package services
+package controller
 
 import actors.Actors.MobileDbActorMessages._
 import actors.Actors.{actorSystem, mobileDbActor}
@@ -21,7 +21,7 @@ trait MobileJsonProtocol extends DefaultJsonProtocol {
   implicit val mobileUpdateFormFormat: RootJsonFormat[MobileUpdateForm] = jsonFormat1(MobileUpdateForm)
 }
 
-object Main extends App with MobileJsonProtocol {
+object Routes extends MobileJsonProtocol {
 
   import actorSystem.dispatcher
 
@@ -75,7 +75,6 @@ object Main extends App with MobileJsonProtocol {
             }
         }
       case None => Future(None)
-
     }
   }
 
@@ -187,10 +186,5 @@ object Main extends App with MobileJsonProtocol {
     case _ => Future(HttpResponse(StatusCodes.NoContent))
   }
 
-  val server = Http().newServerAt("localhost", 9000).bind(httpRequestHandler)
-
-  println("Server is running on http://localhost:9000")
-
-  StdIn.readLine()
-
+  val server: Future[Http.ServerBinding] = Http().newServerAt("localhost", 9000).bind(httpRequestHandler)
 }
